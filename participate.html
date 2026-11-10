@@ -99,6 +99,7 @@
             <h2>Two quick questions</h2>
             <label class="p-wide"><span>Paste the link of the opportunity you found (optional)</span><input name="foundUrl" type="url" placeholder="https://…" /></label>
             <div id="p-post-items"></div>
+            <p class="p-send-note">⏱ After you click <b>Finish</b>, sending your recording takes about <b>3–5 minutes</b>. Keep this window open — you can do other things in other tabs meanwhile.</p>
           </article>
           <div class="p-nav"><button type="button" class="button secondary" data-back>← Back</button><button type="button" class="button primary" data-next>Finish →</button></div>
         </section>
@@ -110,6 +111,10 @@
             <h2 id="p-send-title">Sending your answers…</h2>
             <p class="p-lead" id="p-send-text">Please keep this page open for a moment.</p>
             <div class="p-bar"><span id="p-bar-fill"></span></div>
+            <div class="p-eta" id="p-eta">
+              <p><b id="p-eta-time">About 1 minute</b> · elapsed <span id="p-eta-elapsed">0:00</span></p>
+              <p>Keep this window open until you see “Thank you”. You can switch to other tabs or apps in the meantime — just don’t close this page.</p>
+            </div>
             <div id="p-send-error" hidden>
               <p class="p-error" id="p-send-error-text"></p>
               <div class="p-row"><button type="button" class="button primary" id="p-retry">Try again</button><button type="button" class="button secondary" id="p-backup">Download a backup file</button></div>

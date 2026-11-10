@@ -49,3 +49,8 @@ body.participant{background:var(--cream);min-height:100vh}
 @media(max-width:760px){.p-modes,.p-fields{grid-template-columns:1fr}.p-panel{padding:22px}.p-panel h1{font-size:26px}.p-progress{margin-left:0;width:100%}}
 .p-mode em.p-min{font-style:normal}
 .p-mode:has(input:checked) .p-min{background:var(--green);color:white}
+.p-eta{max-width:520px;margin:6px auto 0;padding:14px 16px;border-radius:12px;background:var(--mint-pale);font-size:14px;line-height:1.55;color:#2f5a54}
+.p-eta p{margin:0}
+.p-eta p+p{margin-top:6px}
+.p-eta b{color:var(--green)}
+.p-send-note{margin:18px 0 0;padding:12px 14px;border-radius:10px;background:#f5efe5;font-size:14px;line-height:1.55;color:#5c4a2c}

@@ -401,6 +401,13 @@ async function submitAll() {
   $("#p-send-title").textContent = "Sending your answers…";
   $("#p-send-text").textContent = "Please keep this page open until it finishes.";
   const setBar = fraction => { $("#p-bar-fill").style.width = `${Math.round(fraction * 100)}%`; };
+  // Expected wait: answers alone ≈ 1 min; with a recording ≈ 3–5 min (upload + saving in Drive).
+  $("#p-eta").hidden = false;
+  $("#p-eta-time").textContent = hasTask() ? "Usually takes 3–5 minutes" : "Usually takes about 1 minute";
+  const sendStarted = Date.now();
+  clearInterval(submitAll.elapsedTimer);
+  submitAll.elapsedTimer = setInterval(() => { $("#p-eta-elapsed").textContent = formatTime(Date.now() - sendStarted).replace(/^0/, ""); }, 1000);
+  const stopElapsed = () => clearInterval(submitAll.elapsedTimer);
   try {
     if (!SUBMIT_URL) throw new Error("This study link is not set up yet, so your answers cannot be sent automatically.");
     if (hasTask()) {
@@ -426,9 +433,12 @@ async function submitAll() {
     try { localStorage.removeItem(DRAFT_KEY); } catch {}
     $("#p-done-id").textContent = state.participantId;
     state.finished = true;
+    stopElapsed();
     showScreen("done");
   } catch (error) {
     console.error(error);
+    stopElapsed();
+    $("#p-eta").hidden = true;
     $("#p-send-title").textContent = "We couldn't send everything yet";
     $("#p-send-text").textContent = "Nothing is lost — your answers are still on this page.";
     $("#p-send-error-text").textContent = /failed to fetch|networkerror|load failed/i.test(error.message || "")
