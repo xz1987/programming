@@ -28,6 +28,7 @@ const formats = [
   "Case competitions",
   "Interdepartmental panels or symposiums"
 ];
+const RESEARCHERS = ["Cora", "Jerry", "Hayden", "Ivie"];
 const scenarios = [
   {
     id: "research",
@@ -83,7 +84,7 @@ function renderChoices() {
   radioGroup('[data-name="searchExperience"]', searchExperiences, "searchExperience");
   checkboxGroup('[data-name="barriers"]', barriers, "barriers");
   checkboxGroup('[data-name="formats"]', formats, "formats");
-  $("#scenario-grid").innerHTML = scenarios.map((scenario, index) => `<label class="scenario-card"><input type="radio" name="scenarioId" value="${scenario.id}" ${index === 0 ? "checked" : ""} /><span class="scenario-number">${scenario.number}</span><strong>${scenario.title}</strong><p>${scenario.prompt}</p><span class="scenario-link">Starts at Human Ecology ↗</span></label>`).join("");
+  $("#scenario-grid").innerHTML = scenarios.map((scenario, index) => `<label class="scenario-card"><input type="radio" name="scenarioId" value="${scenario.id}" ${index === 0 ? "checked" : ""} /><span class="scenario-number">${scenario.number}</span><strong>${scenario.title}</strong><p>${scenario.prompt}</p></label>`).join("");
 }
 
 function renderModuleSetup() {
@@ -102,7 +103,7 @@ function renderModuleSetup() {
         <label><input type="radio" name="participantArrangement" value="same" checked /> Same participant</label>
         <label><input type="radio" name="participantArrangement" value="different" /> Two different participants</label>
       </div>
-      <label class="researcher-field"><span>Researcher</span><input name="researcher" placeholder="e.g., Ivie" autocomplete="off" /></label>
+      <label class="researcher-field"><span>Researcher</span><select name="researcher"><option value="">Select researcher</option>${RESEARCHERS.map(name => `<option>${name}</option>`).join("")}</select></label>
     </article>
     <div class="profile-grid">
       <article id="survey-profile" class="panel participant-profile survey-profile">
@@ -425,6 +426,9 @@ function setExtensionStatus(connected) {
   $("#extension-badge").classList.toggle("complete", connected);
   $("#metric-extension").textContent = connected ? "ON" : "OFF";
   $("#metric-extension-label").textContent = connected ? "Automatic clicks enabled" : "Video still records; clicks optional";
+  $("#extension-badge").title = connected ? "" : `Not detected on ${location.host}. Install the latest extension (Study guide → Download), or click reload on it in chrome://extensions, then refresh this page.`;
+  const hint = $("#extension-hint");
+  if (hint) hint.hidden = connected;
 }
 
 function dispatchTraceCommand(name, detail) {
@@ -463,31 +467,20 @@ async function startRecording() {
   if (!navigator.mediaDevices?.getDisplayMedia) {
     return toast(`Screen recording is unavailable at ${location.origin}. Open the app in Google Chrome over https:// (GitHub Pages) or at http://127.0.0.1:4318 (local server).`);
   }
-  // Chrome only opens the screen picker during a user click, and window.open() uses that click up.
-  // So request the picker FIRST, synchronously inside the click, then open the task tab.
-  const enhancedOptions = { video: { frameRate: { ideal: 15, max: 20 }, displaySurface: "monitor" }, audio: false, preferCurrentTab: false, selfBrowserSurface: "exclude", surfaceSwitching: "include", monitorTypeSurfaces: "include" };
+  // Chrome only shows the screen picker for a direct click on a page that stays in front.
+  // Opening the task tab now would steal focus (InvalidStateError), so ask for the picker
+  // synchronously inside this click and open the task tab only after sharing has started.
+  const displayOptions = { video: { frameRate: { ideal: 15, max: 20 }, displaySurface: "monitor" }, audio: false, selfBrowserSurface: "exclude", surfaceSwitching: "include", monitorTypeSurfaces: "include" };
   let displayRequest;
-  try { displayRequest = navigator.mediaDevices.getDisplayMedia(enhancedOptions); } catch (error) { displayRequest = Promise.reject(error); }
+  try { displayRequest = navigator.mediaDevices.getDisplayMedia(displayOptions); } catch (error) { displayRequest = Promise.reject(error); }
   taskWindow = null;
-  try { taskWindow = window.open("about:blank", "pathways-opportunity-task"); } catch {}
-  if (taskWindow) {
-    try {
-      taskWindow.document.title = "Pathways Task — select this tab or Entire Screen";
-      taskWindow.document.body.innerHTML = '<main style="font-family:system-ui;max-width:680px;margin:15vh auto;padding:32px;color:#163c3a"><h1>Pathways opportunity task</h1><p>This tab is ready. In the share picker, choose <b>Entire Screen</b> for the most reliable recording, or choose this named task tab.</p><p>The assigned opportunity scenario will open after sharing begins.</p></main>';
-    } catch {}
-  }
   hideOpenTaskButton();
   $("#start-recording").disabled = true;
   $("#stop-recording").disabled = true;
   $("#record-label").textContent = "Waiting for screen selection…";
   try {
     stopping = false;
-    try {
-      recordingStream = await displayRequest;
-    } catch (error) {
-      if (error.name !== "TypeError") throw error;
-      recordingStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
-    }
+    recordingStream = await displayRequest;
     const preferred = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(type => MediaRecorder.isTypeSupported(type));
     mediaRecorder = new MediaRecorder(recordingStream, preferred ? { mimeType: preferred, videoBitsPerSecond: 1800000 } : undefined);
     recordingChunks = [];
@@ -561,7 +554,7 @@ function recordingErrorMessage(error) {
     return "macOS is blocking screen recording for Chrome. Open System Settings → Privacy & Security → Screen & System Audio Recording, turn on Google Chrome, restart Chrome, and try again.";
   }
   if (error?.name === "NotAllowedError") return "Screen sharing was cancelled. Choose a screen or window to begin.";
-  if (error?.name === "InvalidStateError") return "Chrome needs a direct click to open the screen picker. Click “Start recording” again.";
+  if (error?.name === "InvalidStateError") return "Chrome blocked the screen picker. Keep this tab in front (close other pop-up tabs) and click “Start recording” again.";
   if (error?.name === "NotReadableError") return "Chrome could not capture that screen. Close other screen-sharing apps or pick a different screen/window, then try again.";
   return `Could not start screen recording (${detail}).`;
 }
@@ -572,7 +565,7 @@ function showOpenTaskButton(url) {
     button = document.createElement("button");
     button.type = "button";
     button.id = "open-task";
-    button.className = "button secondary";
+    button.className = "button primary pulse";
     button.textContent = "↗ Open task tab";
     $("#stop-recording").insertAdjacentElement("beforebegin", button);
   }
@@ -582,7 +575,8 @@ function showOpenTaskButton(url) {
     if (taskWindow) hideOpenTaskButton();
     else toast("Chrome blocked the task tab. Allow pop-ups for this site, or open the link manually.");
   };
-  toast("Recording started. Click “Open task tab” to begin the task.");
+  button.focus();
+  toast("Recording started — now click “Open task tab” to begin searching.");
 }
 
 function hideOpenTaskButton() {
@@ -746,6 +740,7 @@ async function resumeSession(id) {
     }
     const field = form.elements.namedItem(name);
     if (!field || typeof field.value === "undefined") return;
+    if (field.tagName === "SELECT" && value && ![...field.options].some(option => option.value === value)) field.add(new Option(value, value));
     if (field.type === "checkbox") field.checked = Boolean(value); else field.value = value ?? "";
   });
   updateStudyMode();
@@ -758,7 +753,7 @@ async function resumeSession(id) {
   const steps = includedSteps();
   showStep(steps.includes(session.currentStep) ? session.currentStep : steps[0]);
   routeTo("setup");
-  toast("Local draft resumed.");
+  toast(session.status === "complete" ? "Session opened for editing — changes save automatically." : "Local draft resumed.");
 }
 
 function downloadBlob(blob, filename) {
@@ -934,6 +929,95 @@ async function exportAll() {
   }
 }
 
+
+// ---- Import a ZIP made by "Export all data" (or a single complete-session.json) ----
+// Reads stored and deflated entries, so ZIPs re-compressed by Finder/Windows also work.
+async function readZip(file) {
+  const buffer = await file.arrayBuffer();
+  const view = new DataView(buffer);
+  let eocd = -1;
+  for (let i = buffer.byteLength - 22; i >= Math.max(0, buffer.byteLength - 65557); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("This is not a valid ZIP file.");
+  const count = view.getUint16(eocd + 10, true);
+  let pointer = view.getUint32(eocd + 16, true);
+  const decoder = new TextDecoder();
+  const entries = new Map();
+  for (let n = 0; n < count; n++) {
+    if (view.getUint32(pointer, true) !== 0x02014b50) throw new Error("ZIP directory is damaged.");
+    const method = view.getUint16(pointer + 10, true);
+    const compressedSize = view.getUint32(pointer + 20, true);
+    const nameLength = view.getUint16(pointer + 28, true);
+    const extraLength = view.getUint16(pointer + 30, true);
+    const commentLength = view.getUint16(pointer + 32, true);
+    const localOffset = view.getUint32(pointer + 42, true);
+    const name = decoder.decode(new Uint8Array(buffer, pointer + 46, nameLength));
+    pointer += 46 + nameLength + extraLength + commentLength;
+    if (name.endsWith("/") || name.includes("__MACOSX/")) continue;
+    const dataStart = localOffset + 30 + view.getUint16(localOffset + 26, true) + view.getUint16(localOffset + 28, true);
+    const raw = new Blob([new Uint8Array(buffer, dataStart, compressedSize)]);
+    entries.set(name, { method, raw });
+  }
+  const read = async entry => {
+    if (entry.method === 0) return entry.raw;
+    if (entry.method === 8) return new Response(entry.raw.stream().pipeThrough(new DecompressionStream("deflate-raw"))).blob();
+    throw new Error(`Unsupported ZIP compression (method ${entry.method}).`);
+  };
+  return { names: [...entries.keys()], read: async name => read(entries.get(name)) };
+}
+
+function isSessionRecord(value) {
+  return value && typeof value === "object" && typeof value.id === "string" && value.id.length > 0 && typeof value.createdAt === "string";
+}
+
+async function importData(file) {
+  try {
+    const items = []; // { session, recording?: Blob }
+    if (/\.json$/i.test(file.name)) {
+      const session = JSON.parse(await file.text());
+      if (!isSessionRecord(session)) throw new Error("This JSON is not a Pathways complete-session file.");
+      items.push({ session });
+    } else {
+      const zip = await readZip(file);
+      const sessionFiles = zip.names.filter(name => /(^|\/)complete-session\.json$/.test(name));
+      if (!sessionFiles.length) throw new Error("No sessions found. Choose a ZIP made with “Export all data”.");
+      for (const name of sessionFiles) {
+        const session = JSON.parse(await (await zip.read(name)).text());
+        if (!isSessionRecord(session)) continue;
+        const videoName = name.replace(/complete-session\.json$/, "screen-recording.webm");
+        const recording = zip.names.includes(videoName) ? await zip.read(videoName) : null;
+        items.push({ session, recording: recording ? new Blob([recording], { type: session.recordingMimeType || "video/webm" }) : null });
+      }
+    }
+    if (!items.length) throw new Error("No valid sessions found in this file.");
+    const existingIds = new Set((await getSessions()).map(session => session.id));
+    const replacing = items.filter(item => existingIds.has(item.session.id)).length;
+    const recordings = items.filter(item => item.recording).length;
+    const message = `Import ${items.length} session(s) and ${recordings} recording(s) from “${file.name}”?` +
+      (replacing ? `\n\n${replacing} session(s) already exist here and will be replaced with the imported version.` : "");
+    if (!confirm(message)) return;
+    for (const { session, recording } of items) {
+      if (recording) {
+        await putRecording(session.id, recording);
+        session.hasRecording = true;
+        session.recordingBytes = recording.size;
+      } else if (session.hasRecording && !(await getRecording(session.id))) {
+        session.hasRecording = false; // the export did not include the video
+      }
+      session.importedAt = new Date().toISOString();
+      session.importedFrom = file.name;
+      await putSession(session);
+    }
+    toast(`Imported ${items.length} session(s) and ${recordings} recording(s).`);
+    renderSessions();
+    refreshDashboard();
+  } catch (error) {
+    console.error(error);
+    toast(`Import failed: ${error.message}`);
+  }
+}
+
 async function removeSession(id) {
   const session = await getSession(id);
   const participants = session ? moduleParticipants(session) : {};
@@ -961,7 +1045,7 @@ async function renderSessions() {
     const mode = sessionMode(s);
     const p = moduleParticipants(s);
     const participantLabel = mode === "both" && p.surveyId !== p.observationId ? `Survey: ${p.surveyId || "—"} · Observation: ${p.observationId || "—"}` : p.surveyId || p.observationId || "Untitled session";
-    return `<article class="session-card"><div><h3>${escapeHtml(participantLabel)} <span class="module-badge ${mode}">${mode === "both" ? "Survey + observation" : mode}</span> <span class="status ${s.status === "complete" ? "complete" : ""}">${s.status === "complete" ? "Completed" : "Draft"}</span></h3><div class="session-meta"><span>${new Date(s.createdAt).toLocaleString()}</span>${s.moduleStatus?.survey === "complete" ? '<span class="checkpoint">Survey archived</span>' : ""}${mode !== "observation" ? `<span>Survey: ${escapeHtml(p.surveyStage || "Stage not entered")}</span>` : ""}${mode !== "survey" ? `<span>Observation: ${escapeHtml(p.observationStage || "Stage not entered")}</span><span>${escapeHtml(response.scenarioTitle || "No scenario")}</span><span>${stats.clicks} clicks</span><span>${formatTime(stats.dwell)} active</span>` : ""}</div></div><div class="session-actions">${s.status !== "complete" ? `<button class="button primary" data-resume="${s.id}">Resume</button>` : ""}${mode !== "observation" ? `<button class="button secondary" data-export="survey" data-id="${s.id}">Survey CSV</button>` : ""}${mode !== "survey" ? `<button class="button secondary" data-export="observation" data-id="${s.id}">Observation CSV</button>` : ""}${s.traceComplete ? `<button class="button secondary" data-view-trace="${s.id}">View trace</button><button class="button secondary" data-export="tracejson" data-id="${s.id}">Trace JSON</button><button class="button secondary" data-export="trace" data-id="${s.id}">Trace CSV</button>` : ""}${s.hasRecording ? `<button class="button primary" data-export="video" data-id="${s.id}">Raw WebM</button>` : ""}<button class="button secondary" data-export="json" data-id="${s.id}">Complete JSON</button><button class="button danger" data-delete="${s.id}">Delete</button></div></article>`;
+    return `<article class="session-card"><div><h3>${escapeHtml(participantLabel)} <span class="module-badge ${mode}">${mode === "both" ? "Survey + observation" : mode}</span> <span class="status ${s.status === "complete" ? "complete" : ""}">${s.status === "complete" ? "Completed" : "Draft"}</span></h3><div class="session-meta"><span>${new Date(s.createdAt).toLocaleString()}</span>${s.moduleStatus?.survey === "complete" ? '<span class="checkpoint">Survey archived</span>' : ""}${mode !== "observation" ? `<span>Survey: ${escapeHtml(p.surveyStage || "Stage not entered")}</span>` : ""}${mode !== "survey" ? `<span>Observation: ${escapeHtml(p.observationStage || "Stage not entered")}</span><span>${escapeHtml(response.scenarioTitle || "No scenario")}</span><span>${stats.clicks} clicks</span><span>${formatTime(stats.dwell)} active</span>` : ""}</div></div><div class="session-actions"><button class="button primary" data-resume="${s.id}">${s.status === "complete" ? "Open / edit" : "Resume"}</button>${mode !== "observation" ? `<button class="button secondary" data-export="survey" data-id="${s.id}">Survey CSV</button>` : ""}${mode !== "survey" ? `<button class="button secondary" data-export="observation" data-id="${s.id}">Observation CSV</button>` : ""}${s.traceComplete ? `<button class="button secondary" data-view-trace="${s.id}">View trace</button><button class="button secondary" data-export="tracejson" data-id="${s.id}">Trace JSON</button><button class="button secondary" data-export="trace" data-id="${s.id}">Trace CSV</button>` : ""}${s.hasRecording ? `<button class="button primary" data-export="video" data-id="${s.id}">Raw WebM</button>` : ""}<button class="button secondary" data-export="json" data-id="${s.id}">Complete JSON</button><button class="button danger" data-delete="${s.id}">Delete</button></div></article>`;
   }).join("") : '<div class="empty-state"><div style="font-size:36px">◎</div><strong>No local sessions yet</strong><p>Start a study to collect a survey, automatic behavior trace, and raw recording.</p><button class="button primary" data-action="new-session">New session</button></div>';
 }
 
@@ -1030,6 +1114,8 @@ function bindEvents() {
   $("#start-recording").addEventListener("click", startRecording);
   $("#stop-recording").addEventListener("click", () => stopRecording("manual"));
   $("#export-all").addEventListener("click", exportAll);
+  $("#import-data").addEventListener("click", () => $("#import-file").click());
+  $("#import-file").addEventListener("change", event => { const [file] = event.target.files; event.target.value = ""; if (file) importData(file); });
   $("#close-trace").addEventListener("click", () => $("#trace-dialog").close());
   document.addEventListener("PATHWAYS_TRACE_STATUS", event => setExtensionStatus(Boolean(event.detail?.connected)));
   document.addEventListener("PATHWAYS_TRACE_STARTED", event => { if (event.detail?.ok) toast("Automatic click trace started."); });
@@ -1054,8 +1140,8 @@ async function init() {
   if (heroCopy) heroCopy.textContent = "Run a survey, an observation, or both. Link one participant across modules or keep two participants separate.";
   const recordingPrompt = $("#preview-empty");
   if (recordingPrompt) {
-    $("strong", recordingPrompt).textContent = "Share Entire Screen or the named Pathways Task tab";
-    $("p", recordingPrompt).textContent = "The task tab is created before the share picker opens. Entire Screen is the most reliable option.";
+    $("strong", recordingPrompt).textContent = "Click Start recording, then choose Entire Screen";
+    $("p", recordingPrompt).textContent = "After sharing starts, click Open task tab to begin searching. Entire Screen captures every tab you open.";
   }
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
   // Each address keeps its own saved sessions (browser storage is per origin), so say which copy this is.

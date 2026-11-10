@@ -48,3 +48,13 @@
 .scenario-card strong{font-size:17px;line-height:1.3}
 .scenario-card p{font-size:14px;line-height:1.6;margin-bottom:34px}
 .scenario-link{font-size:12px}
+.scenario-card{min-height:200px}
+.scenario-card p{margin-bottom:0}
+
+/* Open-task button after sharing starts, extension hint, import/export actions */
+.pulse{animation:taskPulse 1.4s ease-in-out infinite}
+@keyframes taskPulse{50%{box-shadow:0 0 0 7px rgba(121,218,203,.45)}}
+.extension-hint{margin:14px 0 0;padding:12px 14px;border-radius:9px;background:#f5efe5;font-size:13px;line-height:1.55;color:#5c4a2c}
+.extension-hint a{color:#163c3a;font-weight:700}
+.data-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.researcher-field select{min-width:180px}
