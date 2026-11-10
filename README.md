@@ -2,6 +2,14 @@
 
 Local-first research app for the DEA 6500 Living Program project. Survey and observation are independent modules: run either one alone, link both to the same participant, or assign the two modules to different anonymous participants.
 
+## Participant self-serve link (no researcher present)
+
+`participate.html` — e.g. `https://xz1987.github.io/programming/participate.html` — is a simplified page you can send to participants directly. It opens from **Participant link** in the main app's sidebar (or **Copy participant link** on the overview); it has no way back to the researcher app, no Local data, no export, no extension and no researcher picker.
+
+Flow: welcome + consent → choose Survey (~3 min) / Search task (~10 min) / Both (~13 min) → profile → survey and/or recorded search task → automatic upload → thank-you screen.
+
+Data goes to a Google Apps Script you own (Sheet rows + Drive recordings + an email per participant). One-time setup: [`apps-script/SETUP.md`](apps-script/SETUP.md); then paste the web app URL into `participant-config.js`. Questions are shared with the main app through `questions.js`, so editing a question there changes both pages. Remote participants have no click trace; instead they paste the link of the opportunity they found.
+
 ## 1. Run the app — two ways, same code
 
 | | Online (teammates) | Local server (this computer) |

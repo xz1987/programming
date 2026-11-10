@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#163c3a" />
+    <meta name="robots" content="noindex" />
+    <title>Pathways Study · Participate</title>
+    <link rel="stylesheet" href="styles.css?v=76f792afbd" />
+    <link rel="stylesheet" href="trace.css?v=61667c943f" />
+    <link rel="stylesheet" href="participant.css?v=073106ce40" />
+  </head>
+  <body class="participant">
+    <header class="p-header">
+      <span class="brand-mark"><span></span><span></span><span></span></span>
+      <div><strong>Pathways study</strong><small>Finding cross-major opportunities · DEA 6500</small></div>
+      <ol class="p-progress" id="p-progress" aria-label="Progress"></ol>
+    </header>
+
+    <main class="p-main">
+      <form id="p-form" novalidate autocomplete="off">
+
+        <!-- 1. Welcome -->
+        <section class="p-screen active" data-screen="welcome">
+          <article class="panel p-panel">
+            <span class="eyebrow dark">WELCOME</span>
+            <h1>Help us understand how students find cross-major opportunities</h1>
+            <p class="p-lead">This short study is anonymous. Choose what you have time for — you can do the survey, the search task, or both.</p>
+            <div class="p-modes" id="p-modes"></div>
+            <div class="p-consent">
+              <h3>Before you start</h3>
+              <ul>
+                <li>Participation is voluntary; you can stop at any time by closing this page.</li>
+                <li>We do not ask for your name or email. You get a random anonymous ID.</li>
+                <li>In the search task, your <b>screen is recorded</b> only while you search, and only the screen or window you choose to share. Typed passwords are never collected by this page, but anything visible on the shared screen is recorded — close private tabs first.</li>
+                <li>Your answers and recording are sent securely to the research team's Google Drive and used only for this class study.</li>
+              </ul>
+              <label class="p-check"><input type="checkbox" name="consent" /><span>I have read the above and agree to take part.</span></label>
+            </div>
+          </article>
+          <div class="p-nav"><span></span><button type="button" class="button primary" data-next>Start →</button></div>
+        </section>
+
+        <!-- 2. Profile -->
+        <section class="p-screen" data-screen="profile">
+          <article class="panel p-panel">
+            <span class="eyebrow dark">ABOUT YOU</span>
+            <h2>A little about you</h2>
+            <p class="p-lead">Your anonymous ID is <b id="p-id">—</b>. Keep it if you want to contact us about your data.</p>
+            <div class="p-fields">
+              <label><span>Academic stage *</span><select name="academicStage" data-required></select></label>
+              <label><span>Major / program *</span><input name="major" data-required placeholder="e.g., Design + Environmental Analysis" /></label>
+            </div>
+          </article>
+          <div class="p-nav"><button type="button" class="button secondary" data-back>← Back</button><button type="button" class="button primary" data-next>Next →</button></div>
+        </section>
+
+        <!-- 3. Survey -->
+        <section class="p-screen" data-screen="survey">
+          <article class="panel p-panel questionnaire">
+            <span class="eyebrow dark">SURVEY</span>
+            <h2>Your opportunity-search experience</h2>
+            <fieldset><legend>Have you tried to search for collaborative academic opportunities? *</legend><div class="choice-grid" data-group="searchExperience"></div></fieldset>
+            <fieldset><legend>Select the top barriers you have encountered. *<small>Choose up to 3</small></legend><div class="choice-grid" data-group="barriers"></div></fieldset>
+            <fieldset><legend>Select your preferred opportunity formats. *<small>Choose up to 3</small></legend><div class="choice-grid" data-group="formats"></div></fieldset>
+            <fieldset class="channel-question"><legend>Which channels do you usually use to find collaborative opportunities? *<small>Choose up to 3</small></legend><p class="channel-help-note">For each channel you choose, rate how much it has helped you explore opportunities: <b>1 = Not helpful at all</b> · <b>5 = Very helpful</b>.</p><div class="channel-grid" id="p-channels"></div></fieldset>
+            <fieldset><legend>What information would you most want an opportunity to show? *<small>Choose up to 3</small></legend><div class="choice-grid" data-group="infoWanted"></div></fieldset>
+          </article>
+          <div class="p-nav"><button type="button" class="button secondary" data-back>← Back</button><button type="button" class="button primary" data-next>Next →</button></div>
+        </section>
+
+        <!-- 4. Observation task -->
+        <section class="p-screen" data-screen="task">
+          <article class="panel p-panel">
+            <span class="eyebrow dark">SEARCH TASK</span>
+            <h2>Pick the cross-major opportunity that interests you most</h2>
+            <p class="p-lead">There are three kinds of cross-major opportunities below. Choose the <b>one you are most interested in</b>, then use your web browser to search for a real opportunity of that kind — the same way you normally would (site menus, search boxes, Google, etc.).</p>
+            <div class="scenario-grid" id="p-scenarios"></div>
+            <ol class="task-steps">
+              <li><span class="step-num">1</span><span>Select one card above</span></li>
+              <li><span class="step-num">2</span><span>Click <strong>Start recording</strong> and choose <strong>Entire Screen</strong></span></li>
+              <li><span class="step-num">3</span><span>Click <strong>Open task tab</strong> and search until you find one opportunity (about 5–8 minutes)</span></li>
+              <li><span class="step-num">4</span><span>Come back to this tab and click <strong>Stop recording</strong></span></li>
+            </ol>
+          </article>
+          <article class="panel recorder p-recorder">
+            <div class="record-status"><span id="p-dot"></span><strong id="p-record-label">Ready to record</strong><time id="p-record-time">00:00</time></div>
+            <div id="p-preview-empty" class="preview-empty"><div>◎</div><strong>Your screen preview appears here</strong><p>Chrome will ask which screen to share — choose <b>Entire Screen</b>.</p></div>
+            <video id="p-preview" muted autoplay playsinline></video>
+            <div class="recorder-actions">
+              <button type="button" id="p-start" class="button primary">● Start recording</button>
+              <button type="button" id="p-open-task" class="button primary pulse" hidden>↗ Open task tab</button>
+              <button type="button" id="p-stop" class="button danger" disabled>■ Stop recording</button>
+            </div>
+            <p class="microcopy" id="p-upload-status">Recording uploads automatically in the background.</p>
+          </article>
+          <article class="panel p-panel questionnaire" id="p-after-task" hidden>
+            <span class="eyebrow dark">AFTER THE SEARCH</span>
+            <h2>Two quick questions</h2>
+            <label class="p-wide"><span>Paste the link of the opportunity you found (optional)</span><input name="foundUrl" type="url" placeholder="https://…" /></label>
+            <div id="p-post-items"></div>
+          </article>
+          <div class="p-nav"><button type="button" class="button secondary" data-back>← Back</button><button type="button" class="button primary" data-next>Finish →</button></div>
+        </section>
+
+        <!-- 5. Sending -->
+        <section class="p-screen" data-screen="sending">
+          <article class="panel p-panel p-center">
+            <span class="eyebrow dark">ALMOST DONE</span>
+            <h2 id="p-send-title">Sending your answers…</h2>
+            <p class="p-lead" id="p-send-text">Please keep this page open for a moment.</p>
+            <div class="p-bar"><span id="p-bar-fill"></span></div>
+            <div id="p-send-error" hidden>
+              <p class="p-error" id="p-send-error-text"></p>
+              <div class="p-row"><button type="button" class="button primary" id="p-retry">Try again</button><button type="button" class="button secondary" id="p-backup">Download a backup file</button></div>
+              <p class="microcopy">If sending keeps failing, download the backup file and send it to the research team.</p>
+            </div>
+          </article>
+        </section>
+
+        <!-- 6. Done -->
+        <section class="p-screen" data-screen="done">
+          <article class="panel p-panel p-center">
+            <div class="p-done-mark">✓</div>
+            <h2>Thank you — you're all done!</h2>
+            <p class="p-lead">Your responses were received. Your anonymous ID is <b id="p-done-id">—</b>.</p>
+            <p class="microcopy">You can close this page now.</p>
+          </article>
+        </section>
+      </form>
+    </main>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="participant.js?v=b7a1dc02e5"></script>
+  </body>
+</html>

@@ -1,35 +1,5 @@
-const searchExperiences = [
-  "Searched and participated",
-  "Searched but have not participated yet",
-  "Considered it but did not search",
-  "Never thought about it"
-];
-const barriers = [
-  "Lack of cross-major communication channels",
-  "Conflicting academic schedules",
-  "Unclear credit or grading policies",
-  "No centralized way to find partners",
-  "Faculty discouragement or lack of support",
-  "Insufficient workspace or studios",
-  "Fear of uneven workload distribution",
-  "Limited awareness of existing events",
-  "Cultural silos between majors",
-  "Financial or resource constraints"
-];
-// Survey Q: "How much do you want the following to help you search?" (1 = not interested … 5 = preferred)
-// Survey Q: pick up to 3 channels you usually use (channelsUsed), then rate how helpful each
-// has been for exploring opportunities (channelHelp*: 1 = not helpful at all … 5 = very helpful).
-const MAX_CHANNELS = 3;
-const channels = [
-  { name: "channelHelpStaff", label: "Reaching out to staff in person" },
-  { name: "channelHelpFaculty", label: "Reaching out to faculty in person" },
-  { name: "channelHelpWebsites", label: "Websites" },
-  { name: "channelHelpSocialMedia", label: "Social media" },
-  { name: "channelHelpPeers", label: "Peer networks" },
-  { name: "channelHelpOrganizations", label: "Organizations / clubs" },
-  { name: "channelHelpCampusClasses", label: "On-campus classes" },
-  { name: "channelHelpOnlineClasses", label: "Online classes" }
-];
+import { searchExperiences, barriers, formats, MAX_CHANNELS, channels, infoWantedOptions, scenarios } from "./questions.js?v=6dbd050a6e";
+
 const pickedChannels = () => channels.filter(channel => $(`input[name="channelsUsed"][value="${channel.label}"]`)?.checked);
 
 // Show the 1–5 rating only for picked channels; cap picks at 3 by disabling the rest.
@@ -47,54 +17,7 @@ function syncChannelRows() {
     row.classList.toggle("locked", pick.disabled);
   });
 }
-// Survey Q: what information an opportunity listing should offer (replaces "leadership preference").
-const infoWantedOptions = [
-  "Time commitment & schedule",
-  "Eligibility / who can join",
-  "Credit, pay, or funding",
-  "Suggestions from close friends or mentors",
-  "Previous cases / past projects",
-  "Skills or outcomes I would gain",
-  "Who else is on the team (majors, faculty)",
-  "Contact person & how to apply"
-];
-const formats = [
-  "Joint design studios",
-  "Real-client consulting projects",
-  "Cross-major course team projects",
-  "Hackathons or innovation sprints",
-  "Interdisciplinary research clusters",
-  "Peer study or mentorship circles",
-  "Shared workshops or bootcamps",
-  "Community-engaged action projects",
-  "Case competitions",
-  "Interdepartmental panels or symposiums"
-];
 const RESEARCHERS = ["Cora", "Jerry", "Hayden", "Ivie"];
-const scenarios = [
-  {
-    id: "research",
-    number: "01",
-    title: "Interdisciplinary research",
-    prompt: "Find one research opportunity outside your home discipline that you could realistically join within the next six months.",
-    startUrl: "https://www.human.cornell.edu/"
-  },
-  {
-    id: "community",
-    number: "02",
-    title: "Real-client or community project",
-    prompt: "Find one cross-major project involving a real client or community partner that fits your interests and schedule.",
-    startUrl: "https://www.human.cornell.edu/"
-  },
-  {
-    id: "short-format",
-    number: "03",
-    title: "Workshop or innovation sprint",
-    prompt: "Find one short workshop, bootcamp, hackathon, or innovation sprint with enough information to decide whether to participate.",
-    startUrl: "https://www.human.cornell.edu/"
-  }
-];
-
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const form = $("#study-form");
@@ -1181,6 +1104,11 @@ function bindEvents() {
   $("#start-recording").addEventListener("click", startRecording);
   $("#stop-recording").addEventListener("click", () => stopRecording("manual"));
   $("#export-all").addEventListener("click", exportAll);
+  $("#copy-participant-link")?.addEventListener("click", async () => {
+    const link = new URL("participate.html", location.href.split("#")[0]).href;
+    try { await navigator.clipboard.writeText(link); toast(`Copied: ${link}`); }
+    catch { prompt("Copy this participant link:", link); }
+  });
   $("#import-data").addEventListener("click", () => $("#import-file").click());
   $("#import-file").addEventListener("change", event => { const [file] = event.target.files; event.target.value = ""; if (file) importData(file); });
   $("#close-trace").addEventListener("click", () => $("#trace-dialog").close());

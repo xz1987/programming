@@ -15,7 +15,8 @@ if (resolve(target) === resolve(root)) throw new Error("Target must be a differe
 execFileSync(process.execPath, [join(root, "scripts/build.mjs")], { stdio: "inherit" });
 
 const items = [
-  "index.html", "app.js", "styles.css", "trace.css",
+  "index.html", "participate.html", "app.js", "participant.js", "questions.js", "participant-config.js",
+  "styles.css", "trace.css", "participant.css", "apps-script",
   "server.mjs", "package.json", "README.md", "Start Pathways.command",
   "scripts", "trace-extension", "dist", ".github/workflows/pages.yml"
 ];

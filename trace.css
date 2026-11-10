@@ -10,15 +10,15 @@
 @media(max-width:650px){.scenario-grid{grid-template-columns:1fr}.arrangement-row{align-items:start;flex-direction:column;gap:9px}}
 
 /* ---- Readability: larger survey text, 1–5 sliders, scenario cards ---- */
-#study-form{--thumb:28px}
-#study-form .form-panel>p{font-size:15px;line-height:1.6}
-#study-form legend{font-size:16px;line-height:1.4;margin-bottom:14px}
-#study-form legend small{font-size:13px}
-#study-form label{font-size:14px}
-#study-form input,#study-form select,#study-form textarea{font-size:15px}
-#study-form .choice{font-size:15px;padding:13px 14px;line-height:1.4}
-#study-form .choice input{width:18px;height:18px;flex:none}
-#study-form .choice-grid{gap:10px}
+:is(#study-form,#p-form){--thumb:28px}
+:is(#study-form,#p-form) .form-panel>p{font-size:15px;line-height:1.6}
+:is(#study-form,#p-form) legend{font-size:16px;line-height:1.4;margin-bottom:14px}
+:is(#study-form,#p-form) legend small{font-size:13px}
+:is(#study-form,#p-form) label{font-size:14px}
+:is(#study-form,#p-form) input,:is(#study-form,#p-form) select,:is(#study-form,#p-form) textarea{font-size:15px}
+:is(#study-form,#p-form) .choice{font-size:15px;padding:13px 14px;line-height:1.4}
+:is(#study-form,#p-form) .choice input{width:18px;height:18px;flex:none}
+:is(#study-form,#p-form) .choice-grid{gap:10px}
 
 .scale-block{padding:24px 0 10px}
 .scale-block>div:first-child{align-items:center;gap:16px}
@@ -67,8 +67,8 @@
 .channel-row:has(input:checked){border-color:#a9cfc8}
 .channel-label{font-size:15px;font-weight:500}
 .channel-options{display:flex;gap:6px}
-#study-form .channel-option{display:block;position:relative;cursor:pointer}
-#study-form .channel-option input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+:is(#study-form,#p-form) .channel-option{display:block;position:relative;cursor:pointer}
+:is(#study-form,#p-form) .channel-option input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
 .channel-option span{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;border:1.5px solid #cfd5d1;font-size:14px;font-weight:700;color:#6b7876;background:white;transition:.12s}
 .channel-option:hover span{border-color:#5f9c91;color:var(--green)}
 .channel-option input:checked+span{background:var(--green);border-color:var(--green);color:white}
@@ -81,8 +81,8 @@
 /* Channels v3: pick up to 3, then rate helpfulness */
 .channel-help-note{font-size:14px;color:var(--muted);margin:-6px 0 12px;line-height:1.5}
 .channel-row{grid-template-columns:1fr;gap:0;padding:0;overflow:hidden}
-#study-form .channel-pick{display:flex;align-items:center;gap:12px;padding:13px 14px;font-size:15px;font-weight:500;cursor:pointer}
-#study-form .channel-pick input{width:18px;height:18px;flex:none;accent-color:var(--green)}
+:is(#study-form,#p-form) .channel-pick{display:flex;align-items:center;gap:12px;padding:13px 14px;font-size:15px;font-weight:500;cursor:pointer}
+:is(#study-form,#p-form) .channel-pick input{width:18px;height:18px;flex:none;accent-color:var(--green)}
 .channel-row.picked{border-color:#79b7ad;background:var(--mint-pale)}
 .channel-row.locked{opacity:.45}
 .channel-row.locked .channel-pick{cursor:not-allowed}

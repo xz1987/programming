@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#163c3a" />
     <title>Pathways · Research Trace Kit</title>
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="trace.css" />
+    <link rel="stylesheet" href="styles.css?v=76f792afbd" />
+    <link rel="stylesheet" href="trace.css?v=61667c943f" />
   </head>
   <body>
     <div class="shell">
@@ -20,6 +20,7 @@
           <button class="nav-item" data-route="setup"><span>＋</span>New session</button>
           <button class="nav-item" data-route="sessions"><span>≡</span>Local data</button>
           <button class="nav-item" data-route="guide"><span>?</span>Study guide</button>
+          <a class="nav-item" href="participate.html" target="_blank" rel="noopener"><span>↗</span>Participant link</a>
         </nav>
         <div class="local-card"><div class="local-row"><i></i><strong>Local only</strong></div><p>Surveys, traces, and recordings are never uploaded automatically.</p></div>
       </aside>
@@ -28,7 +29,7 @@
         <header class="topbar"><div><span class="eyebrow">DEA 6500 · LIVING PROGRAM</span><h1 id="page-title">Study overview</h1></div><button class="button primary compact" data-action="new-session">＋ New session</button></header>
         <section id="dashboard" class="view active">
           <div class="hero">
-            <div><span class="pill">AUTOMATED BEHAVIOR TRACE</span><h2>See how students<br />find opportunities</h2><p>Pair a short survey with screen recording, automatic click traces, page dwell time, and a focused post-task evaluation.</p><div class="hero-actions"><button class="button light" data-action="new-session">Start a study session</button><button class="text-button" data-route="guide">Setup guide →</button></div></div>
+            <div><span class="pill">AUTOMATED BEHAVIOR TRACE</span><h2>See how students<br />find opportunities</h2><p>Pair a short survey with screen recording, automatic click traces, page dwell time, and a focused post-task evaluation.</p><div class="hero-actions"><button class="button light" data-action="new-session">Start a study session</button><button class="button light" id="copy-participant-link" type="button">⧉ Copy participant link</button><button class="text-button" data-route="guide">Setup guide →</button></div></div>
             <div class="path-visual" aria-hidden="true"><div class="path-node n1"><b>01</b><span>Discover</span></div><div class="path-node n2"><b>02</b><span>Judge fit</span></div><div class="path-node n3"><b>03</b><span>Next step</span></div><svg viewBox="0 0 500 280"><path d="M55 185 C140 20, 240 260, 445 70" /><path class="dash" d="M55 185 C140 20, 240 260, 445 70" /></svg></div>
           </div>
           <div class="metric-grid">
@@ -75,6 +76,6 @@
     </div>
     <dialog id="trace-dialog" class="trace-dialog"><div class="dialog-head"><div><span class="eyebrow dark">TRACE VIEWER</span><h2 id="trace-dialog-title">Session trace</h2></div><button id="close-trace" aria-label="Close trace viewer">×</button></div><div id="trace-dialog-summary" class="trace-stats"></div><div id="trace-dialog-body" class="trace-timeline"></div></dialog>
     <div id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=b21c543f4d"></script>
   </body>
 </html>
