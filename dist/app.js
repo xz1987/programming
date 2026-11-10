@@ -17,17 +17,36 @@ const barriers = [
   "Financial or resource constraints"
 ];
 // Survey Q: "How much do you want the following to help you search?" (1 = not interested … 5 = preferred)
+// Survey Q: pick up to 3 channels you usually use (channelsUsed), then rate how helpful each
+// has been for exploring opportunities (channelHelp*: 1 = not helpful at all … 5 = very helpful).
+const MAX_CHANNELS = 3;
 const channels = [
-  { name: "channelStaff", label: "Reaching out to staff in person" },
-  { name: "channelFaculty", label: "Reaching out to faculty in person" },
-  { name: "channelWebsites", label: "Websites" },
-  { name: "channelSocialMedia", label: "Social media" },
-  { name: "channelPeers", label: "Peer networks" },
-  { name: "channelOrganizations", label: "Organizations / clubs" },
-  { name: "channelCampusClasses", label: "On-campus classes" },
-  { name: "channelOnlineClasses", label: "Online classes" }
+  { name: "channelHelpStaff", label: "Reaching out to staff in person" },
+  { name: "channelHelpFaculty", label: "Reaching out to faculty in person" },
+  { name: "channelHelpWebsites", label: "Websites" },
+  { name: "channelHelpSocialMedia", label: "Social media" },
+  { name: "channelHelpPeers", label: "Peer networks" },
+  { name: "channelHelpOrganizations", label: "Organizations / clubs" },
+  { name: "channelHelpCampusClasses", label: "On-campus classes" },
+  { name: "channelHelpOnlineClasses", label: "Online classes" }
 ];
-const ratedChannelCount = () => channels.filter(({ name }) => $(`input[name="${name}"]:checked`)).length;
+const pickedChannels = () => channels.filter(channel => $(`input[name="channelsUsed"][value="${channel.label}"]`)?.checked);
+
+// Show the 1–5 rating only for picked channels; cap picks at 3 by disabling the rest.
+function syncChannelRows() {
+  const picked = pickedChannels();
+  channels.forEach(channel => {
+    const row = $(`.channel-row[data-channel="${channel.name}"]`);
+    if (!row) return;
+    const isPicked = picked.includes(channel);
+    row.classList.toggle("picked", isPicked);
+    $(".channel-rating", row).hidden = !isPicked;
+    if (!isPicked) $$(`input[name="${channel.name}"]`, row).forEach(input => { input.checked = false; });
+    const pick = $('input[name="channelsUsed"]', row);
+    pick.disabled = !isPicked && picked.length >= MAX_CHANNELS;
+    row.classList.toggle("locked", pick.disabled);
+  });
+}
 // Survey Q: what information an opportunity listing should offer (replaces "leadership preference").
 const infoWantedOptions = [
   "Time commitment & schedule",
@@ -108,7 +127,7 @@ function renderChoices() {
   checkboxGroup('[data-name="barriers"]', barriers, "barriers");
   checkboxGroup('[data-name="formats"]', formats, "formats");
   checkboxGroup('[data-name="infoWanted"]', infoWantedOptions, "infoWanted");
-  $('[data-name="channels"]').innerHTML = channels.map(channel => `<div class="channel-row" role="radiogroup" aria-label="${escapeHtml(channel.label)}"><span class="channel-label">${escapeHtml(channel.label)}</span><div class="channel-options">${[1, 2, 3, 4, 5].map(value => `<label class="channel-option" title="${value === 1 ? "Not interested" : value === 5 ? "Preferred" : value}"><input type="radio" name="${channel.name}" value="${value}" /><span>${value}</span></label>`).join("")}</div></div>`).join("");
+  $('[data-name="channels"]').innerHTML = channels.map(channel => `<div class="channel-row" data-channel="${channel.name}"><label class="channel-pick"><input type="checkbox" name="channelsUsed" value="${escapeHtml(channel.label)}" /><span>${escapeHtml(channel.label)}</span></label><div class="channel-rating" hidden><span class="channel-rating-label">How helpful?</span><div class="channel-options" role="radiogroup" aria-label="How helpful: ${escapeHtml(channel.label)}">${[1, 2, 3, 4, 5].map(value => `<label class="channel-option" title="${value === 1 ? "Not helpful at all" : value === 5 ? "Very helpful" : value}"><input type="radio" name="${channel.name}" value="${value}" /><span>${value}</span></label>`).join("")}</div><span class="channel-ends"><span>Not helpful</span><span>Very helpful</span></span></div></div>`).join("");
   $("#scenario-grid").innerHTML = scenarios.map((scenario, index) => `<label class="scenario-card"><input type="radio" name="scenarioId" value="${scenario.id}" ${index === 0 ? "checked" : ""} /><span class="scenario-number">${scenario.number}</span><strong>${scenario.title}</strong><p>${scenario.prompt}</p></label>`).join("");
 }
 
@@ -204,6 +223,7 @@ function toggleSection(section, enabled) {
 }
 
 function updateStudyMode() {
+  syncChannelRows();
   const mode = selectedMode();
   const arrangement = form.elements.participantArrangement?.value || "same";
   const hasSurvey = mode === "survey" || mode === "both";
@@ -336,9 +356,11 @@ function validateStep() {
   const invalid = $$('[required]', section).find(field => !field.checkValidity());
   if (invalid) { invalid.reportValidity(); toast("Please complete the required items."); return false; }
   if (currentStep === 1 && selectedMode() !== "observation") {
-    if (!ratedChannelCount()) {
+    const picked = pickedChannels();
+    const unrated = picked.find(channel => !$(`input[name="${channel.name}"]:checked`));
+    if (!picked.length || unrated) {
       $(".channel-question")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      toast("Rate at least one channel you would like to use.");
+      toast(!picked.length ? "Choose at least one channel you usually use." : `Rate how helpful “${unrated.label}” has been (1–5).`);
       return false;
     }
     for (const name of ["barriers", "formats"]) {
@@ -359,8 +381,11 @@ function collectValues() {
   const hasSurvey = mode === "survey" || mode === "both";
   const hasObservation = mode === "observation" || mode === "both";
   if (hasSurvey) ["barriers", "formats", "infoWanted"].forEach(name => data[name] = $$(`input[name="${name}"]:checked`).map(input => input.value));
-  if (hasSurvey) channels.forEach(({ name }) => data[name] = data[name] ? Number(data[name]) : "");
-  if (hasObservation) ["resultSatisfaction", "helpNeeded", "relevanceClarity", "informationClarity", "nextStepClarity"].forEach(name => data[name] = Number(data[name] || 0));
+  if (hasSurvey) {
+    data.channelsUsed = $$('input[name="channelsUsed"]:checked').map(input => input.value);
+    channels.forEach(({ name, label }) => data[name] = data.channelsUsed.includes(label) && data[name] ? Number(data[name]) : "");
+  }
+  if (hasObservation) ["resultSatisfaction", "decisionInfo"].forEach(name => data[name] = Number(data[name] || 0));
   if (mode === "both" && (data.participantArrangement || "same") === "same") {
     data.observationParticipantId = data.surveyParticipantId;
     data.observationStudyStage = data.surveyStudyStage;
@@ -379,7 +404,7 @@ function surveyIsComplete() {
   if (mode === "observation") return false;
   const response = collectValues();
   const profileComplete = Boolean(response.surveyParticipantId && response.surveyStudyStage && response.surveyMajor);
-  const questionsComplete = Boolean(response.searchExperience && channels.some(({ name }) => response[name]) && response.barriers?.length >= 1 && response.barriers.length <= 3 && response.formats?.length >= 1 && response.formats.length <= 3);
+  const questionsComplete = Boolean(response.searchExperience && response.channelsUsed?.length >= 1 && response.channelsUsed.length <= MAX_CHANNELS && channels.every(({ name, label }) => !response.channelsUsed.includes(label) || response[name]) && response.barriers?.length >= 1 && response.barriers.length <= 3 && response.formats?.length >= 1 && response.formats.length <= 3);
   return profileComplete && questionsComplete;
 }
 
@@ -824,13 +849,13 @@ function pickFields(source, names) {
 
 function surveyRow(session) {
   const participants = moduleParticipants(session);
-  return { session_id: session.id, module: "survey", participant_id: participants.surveyId, academic_stage: participants.surveyStage, major: session.responses?.surveyMajor || session.responses?.major || "", ...pickFields(session.responses, ["searchExperience", "barriers", "formats", ...channels.map(channel => channel.name), "infoWanted"]), ...pickFields(session.responses, ["schedulePreference", "fundingPreference", "leadershipPreference", "channelOther"].filter(name => session.responses?.[name] !== undefined && session.responses?.[name] !== "")), survey_status: session.moduleStatus?.survey || "", completed_at: session.surveyCompletedAt || session.completedAt || "" };
+  return { session_id: session.id, module: "survey", participant_id: participants.surveyId, academic_stage: participants.surveyStage, major: session.responses?.surveyMajor || session.responses?.major || "", ...pickFields(session.responses, ["searchExperience", "barriers", "formats", "channelsUsed", ...channels.map(channel => channel.name), "infoWanted"]), ...pickFields(session.responses, ["schedulePreference", "fundingPreference", "leadershipPreference", "channelStaff", "channelFaculty", "channelWebsites", "channelSocialMedia", "channelPeers", "channelOrganizations", "channelCampusClasses", "channelOnlineClasses", "channelOther"].filter(name => session.responses?.[name] !== undefined && session.responses?.[name] !== "")), survey_status: session.moduleStatus?.survey || "", completed_at: session.surveyCompletedAt || session.completedAt || "" };
 }
 
 function observationRow(session) {
   const participants = moduleParticipants(session);
   const stats = traceStats(session);
-  return { session_id: session.id, module: "observation", participant_id: participants.observationId, academic_stage: participants.observationStage, major: session.responses?.observationMajor || session.responses?.major || "", scenario: session.responses?.scenarioTitle || "", duration_ms: session.recordingDurationMs || 0, has_recording: Boolean(session.hasRecording), trace_mode: session.traceMode || "", click_count: stats.clicks, page_count: stats.pages.length, active_dwell_ms: stats.dwell, ...pickFields(session.responses, ["resultSatisfaction", "helpNeeded", "relevanceClarity", "informationClarity", "nextStepClarity", "confusingMoment", "oneChange"]), completed_at: session.observationCompletedAt || session.completedAt || "" };
+  return { session_id: session.id, module: "observation", participant_id: participants.observationId, academic_stage: participants.observationStage, major: session.responses?.observationMajor || session.responses?.major || "", scenario: session.responses?.scenarioTitle || "", duration_ms: session.recordingDurationMs || 0, has_recording: Boolean(session.hasRecording), trace_mode: session.traceMode || "", click_count: stats.clicks, page_count: stats.pages.length, active_dwell_ms: stats.dwell, ...pickFields(session.responses, ["resultSatisfaction", "decisionInfo"]), ...pickFields(session.responses, ["helpNeeded", "relevanceClarity", "informationClarity", "nextStepClarity", "confusingMoment", "oneChange"].filter(name => session.responses?.[name] !== undefined && session.responses?.[name] !== "")), completed_at: session.observationCompletedAt || session.completedAt || "" };
 }
 
 function traceJson(session) {
@@ -1141,6 +1166,7 @@ function bindEvents() {
     const name = event.target.name;
     if (event.target.checked && $$(`input[name="${name}"]:checked`).length > 3) { event.target.checked = false; toast("Choose up to 3 options."); }
   }));
+  $('[data-name="channels"]')?.addEventListener("change", event => { if (event.target.name === "channelsUsed") syncChannelRows(); });
   $('[data-name="channels"]')?.addEventListener("pointerdown", event => {
     const input = event.target.closest(".channel-option")?.querySelector("input");
     if (input) input.dataset.wasChecked = String(input.checked);
