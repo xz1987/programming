@@ -16,6 +16,29 @@ const barriers = [
   "Cultural silos between majors",
   "Financial or resource constraints"
 ];
+// Survey Q: "How much do you want the following to help you search?" (1 = not interested … 5 = preferred)
+const channels = [
+  { name: "channelStaff", label: "Reaching out to staff in person" },
+  { name: "channelFaculty", label: "Reaching out to faculty in person" },
+  { name: "channelWebsites", label: "Websites" },
+  { name: "channelSocialMedia", label: "Social media" },
+  { name: "channelPeers", label: "Peer networks" },
+  { name: "channelOrganizations", label: "Organizations / clubs" },
+  { name: "channelCampusClasses", label: "On-campus classes" },
+  { name: "channelOnlineClasses", label: "Online classes" }
+];
+const ratedChannelCount = () => channels.filter(({ name }) => $(`input[name="${name}"]:checked`)).length;
+// Survey Q: what information an opportunity listing should offer (replaces "leadership preference").
+const infoWantedOptions = [
+  "Time commitment & schedule",
+  "Eligibility / who can join",
+  "Credit, pay, or funding",
+  "Suggestions from close friends or mentors",
+  "Previous cases / past projects",
+  "Skills or outcomes I would gain",
+  "Who else is on the team (majors, faculty)",
+  "Contact person & how to apply"
+];
 const formats = [
   "Joint design studios",
   "Real-client consulting projects",
@@ -84,6 +107,8 @@ function renderChoices() {
   radioGroup('[data-name="searchExperience"]', searchExperiences, "searchExperience");
   checkboxGroup('[data-name="barriers"]', barriers, "barriers");
   checkboxGroup('[data-name="formats"]', formats, "formats");
+  checkboxGroup('[data-name="infoWanted"]', infoWantedOptions, "infoWanted");
+  $('[data-name="channels"]').innerHTML = channels.map(channel => `<div class="channel-row" role="radiogroup" aria-label="${escapeHtml(channel.label)}"><span class="channel-label">${escapeHtml(channel.label)}</span><div class="channel-options">${[1, 2, 3, 4, 5].map(value => `<label class="channel-option" title="${value === 1 ? "Not interested" : value === 5 ? "Preferred" : value}"><input type="radio" name="${channel.name}" value="${value}" /><span>${value}</span></label>`).join("")}</div></div>`).join("");
   $("#scenario-grid").innerHTML = scenarios.map((scenario, index) => `<label class="scenario-card"><input type="radio" name="scenarioId" value="${scenario.id}" ${index === 0 ? "checked" : ""} /><span class="scenario-number">${scenario.number}</span><strong>${scenario.title}</strong><p>${scenario.prompt}</p></label>`).join("");
 }
 
@@ -311,6 +336,11 @@ function validateStep() {
   const invalid = $$('[required]', section).find(field => !field.checkValidity());
   if (invalid) { invalid.reportValidity(); toast("Please complete the required items."); return false; }
   if (currentStep === 1 && selectedMode() !== "observation") {
+    if (!ratedChannelCount()) {
+      $(".channel-question")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast("Rate at least one channel you would like to use.");
+      return false;
+    }
     for (const name of ["barriers", "formats"]) {
       const count = $$(`input[name="${name}"]:checked`).length;
       if (!count || count > 3) { toast(`Select 1–3 ${name}.`); return false; }
@@ -328,8 +358,8 @@ function collectValues() {
   const mode = data.studyMode || selectedMode();
   const hasSurvey = mode === "survey" || mode === "both";
   const hasObservation = mode === "observation" || mode === "both";
-  if (hasSurvey) ["barriers", "formats"].forEach(name => data[name] = $$(`input[name="${name}"]:checked`).map(input => input.value));
-  if (hasSurvey) ["schedulePreference", "fundingPreference", "leadershipPreference"].forEach(name => data[name] = Number(data[name] || 0));
+  if (hasSurvey) ["barriers", "formats", "infoWanted"].forEach(name => data[name] = $$(`input[name="${name}"]:checked`).map(input => input.value));
+  if (hasSurvey) channels.forEach(({ name }) => data[name] = data[name] ? Number(data[name]) : "");
   if (hasObservation) ["resultSatisfaction", "helpNeeded", "relevanceClarity", "informationClarity", "nextStepClarity"].forEach(name => data[name] = Number(data[name] || 0));
   if (mode === "both" && (data.participantArrangement || "same") === "same") {
     data.observationParticipantId = data.surveyParticipantId;
@@ -349,7 +379,7 @@ function surveyIsComplete() {
   if (mode === "observation") return false;
   const response = collectValues();
   const profileComplete = Boolean(response.surveyParticipantId && response.surveyStudyStage && response.surveyMajor);
-  const questionsComplete = Boolean(response.searchExperience && response.barriers?.length >= 1 && response.barriers.length <= 3 && response.formats?.length >= 1 && response.formats.length <= 3);
+  const questionsComplete = Boolean(response.searchExperience && channels.some(({ name }) => response[name]) && response.barriers?.length >= 1 && response.barriers.length <= 3 && response.formats?.length >= 1 && response.formats.length <= 3);
   return profileComplete && questionsComplete;
 }
 
@@ -794,7 +824,7 @@ function pickFields(source, names) {
 
 function surveyRow(session) {
   const participants = moduleParticipants(session);
-  return { session_id: session.id, module: "survey", participant_id: participants.surveyId, academic_stage: participants.surveyStage, major: session.responses?.surveyMajor || session.responses?.major || "", ...pickFields(session.responses, ["searchExperience", "barriers", "formats", "schedulePreference", "fundingPreference", "leadershipPreference"]), survey_status: session.moduleStatus?.survey || "", completed_at: session.surveyCompletedAt || session.completedAt || "" };
+  return { session_id: session.id, module: "survey", participant_id: participants.surveyId, academic_stage: participants.surveyStage, major: session.responses?.surveyMajor || session.responses?.major || "", ...pickFields(session.responses, ["searchExperience", "barriers", "formats", ...channels.map(channel => channel.name), "infoWanted"]), ...pickFields(session.responses, ["schedulePreference", "fundingPreference", "leadershipPreference", "channelOther"].filter(name => session.responses?.[name] !== undefined && session.responses?.[name] !== "")), survey_status: session.moduleStatus?.survey || "", completed_at: session.surveyCompletedAt || session.completedAt || "" };
 }
 
 function observationRow(session) {
@@ -1111,6 +1141,17 @@ function bindEvents() {
     const name = event.target.name;
     if (event.target.checked && $$(`input[name="${name}"]:checked`).length > 3) { event.target.checked = false; toast("Choose up to 3 options."); }
   }));
+  $('[data-name="channels"]')?.addEventListener("pointerdown", event => {
+    const input = event.target.closest(".channel-option")?.querySelector("input");
+    if (input) input.dataset.wasChecked = String(input.checked);
+  });
+  $('[data-name="channels"]')?.addEventListener("click", event => {
+    const input = event.target.closest(".channel-option input");
+    if (!input || input.dataset.wasChecked !== "true") return;
+    input.dataset.wasChecked = "false";
+    input.checked = false;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   $("#start-recording").addEventListener("click", startRecording);
   $("#stop-recording").addEventListener("click", () => stopRecording("manual"));
   $("#export-all").addEventListener("click", exportAll);
