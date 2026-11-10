@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Pathways Research Trace Capture",
+  "version": "1.1.0",
+  "description": "Consent-based click and page-dwell capture for Pathways research sessions (local server or GitHub Pages).",
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_title": "Pathways trace capture"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "pathways-research-kit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "open": "node server.mjs --open",
+    "build": "node scripts/build.mjs",
+    "test": "node trace-extension/test-background.mjs",
+    "sync-pages": "node scripts/sync-pages.mjs"
+  }
+}
