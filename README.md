@@ -8,6 +8,8 @@ Local-first research app for the DEA 6500 Living Program project. Survey and obs
 
 Flow: welcome + consent → choose Survey (~3 min) / Search task (~10 min) / Both (~13 min) → profile → survey and/or recorded search task → automatic upload → thank-you screen.
 
+**The researcher app sends too:** when a researcher clicks **Save completed session**, the session (answers, click trace, recording) is uploaded to the same Apps Script and the email names the researcher. Local data shows **Sent to team ✓** or **Not sent → Retry send**, and **⇪ Send unsent to team** sends everything still pending. The local copy and Export stay as a backup.
+
 Data goes to a Google Apps Script you own (Sheet rows + Drive recordings + an email per participant). One-time setup: [`apps-script/SETUP.md`](apps-script/SETUP.md); then paste the web app URL into `participant-config.js`. Questions are shared with the main app through `questions.js`, so editing a question there changes both pages. Remote participants have no click trace; instead they paste the link of the opportunity they found.
 
 ## 1. Run the app — two ways, same code

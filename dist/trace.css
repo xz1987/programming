@@ -101,3 +101,9 @@
 .task-steps strong{color:var(--ink)}
 .task-steps .step-num{width:24px;height:24px;border-radius:50%;background:var(--green);color:var(--mint);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;margin-top:1px}
 @media(max-width:700px){.task-steps{grid-template-columns:1fr}}
+
+/* Team upload status in Local data */
+.upload-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:800;background:#f3ece0;color:#8a6a35}
+.upload-badge.sent{background:var(--mint-pale);color:#2f7a6e}
+.upload-badge.sending{background:#e8eef6;color:#3b5f8a}
+.upload-badge.failed{background:#f8e3df;color:#a2473d}

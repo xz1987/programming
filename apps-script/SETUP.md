@@ -58,6 +58,10 @@ Open `https://xz1987.github.io/programming/participate.html`, do **Survey only**
 - If a participant submits twice (e.g. after a retry), their row is updated, not duplicated.
 - Gmail allows about 100 notification emails per day from a script — plenty for a class study.
 
+## Sessions from the researcher app
+
+Sessions saved in the main researcher app are sent to the same script. In the Sheet they have `source = researcher-app`, a `researcher` column, and separate `survey_…` / `observation_…` participant columns. Their Drive folder also contains `trace.json` (click trace) and `complete-session.json`. The email subject reads "Pathways: session by Cora · P-… · Survey + observation" ("(updated)" when a session is edited and saved again — the recording is not re-uploaded).
+
 ## Changing the script later
 
 Edit `Code.gs` in the Apps Script editor, then **Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy**. The URL stays the same, so the participant page needs no change. (Creating a *new* deployment instead would give a new URL.)

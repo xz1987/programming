@@ -18,6 +18,7 @@ const ROOT_FOLDER_NAME = "Pathways participant uploads";
 const SHEET_NAME = "Submissions";
 const MAX_CHUNK_BASE64 = 14 * 1024 * 1024;   // ~10 MB of video per upload request
 const MAX_PARTS = 400;
+const MAX_FILE_CHARS = 8 * 1024 * 1024;      // trace.json / complete-session.json
 const MERGE_LIMIT_BYTES = 30 * 1024 * 1024;  // larger recordings stay in pieces (Apps Script memory)
 
 const SESSION_ID = /^[A-Za-z0-9_-]{6,80}$/;
@@ -72,12 +73,22 @@ function submit_(body) {
   const expectedParts = Number(body.partCount || 0);
 
   let recording = { status: "none", file: "", parts: 0, missing: "" };
-  if (attempt > 0 && expectedParts > 0) recording = finishRecording_(folder, attempt, expectedParts);
+  if (body.keepRecording) recording = { status: "unchanged", file: "", parts: 0, missing: "" }; // re-sent after an edit
+  else if (attempt > 0 && expectedParts > 0) recording = finishRecording_(folder, attempt, expectedParts);
+
+  // Extra files from the researcher app (click trace, full session record). Only known names.
+  const files = body.files || {};
+  ["trace.json", "complete-session.json"].forEach(function (name) {
+    if (typeof files[name] !== "string" || files[name].length > MAX_FILE_CHARS) return;
+    trashByName_(folder, name);
+    folder.createFile(name, files[name], "application/json");
+  });
 
   record.session_id = body.sessionId;
   record.participant_id = body.participantId;
   record.received_at = new Date().toISOString();
-  record.recording_status = recording.status;
+  if (recording.status !== "unchanged") record.recording_status = recording.status;
+  else record.recording_status = "uploaded earlier";
   record.recording_parts = recording.parts;
   record.recording_missing_parts = recording.missing;
   record.drive_folder = folder.getUrl();
@@ -196,7 +207,9 @@ function cell_(value) {
 
 function notify_(record, folder, recording) {
   const minutes = record.total_ms ? Math.round(record.total_ms / 60000) + " min" : "";
-  const subject = "Pathways: new participant " + record.participant_id + " · " + (record.mode_label || record.mode || "") + (minutes ? " · " + minutes : "");
+  const fromResearcher = record.source === "researcher-app";
+  const who = fromResearcher ? "session by " + (record.researcher || "a researcher") + " · " : "new participant ";
+  const subject = "Pathways: " + who + record.participant_id + " · " + (record.mode_label || record.mode || "") + (!fromResearcher && minutes ? " · " + minutes : "") + (record.resent ? " (updated)" : "");
   const rows = Object.keys(record).map(function (key) {
     return "<tr><td style='padding:4px 10px;color:#61706e;vertical-align:top'>" + escape_(key) + "</td><td style='padding:4px 10px'>" + escape_(cell_(record[key])) + "</td></tr>";
   }).join("");
@@ -204,7 +217,8 @@ function notify_(record, folder, recording) {
     merged: "Recording saved as screen-recording.webm.",
     parts: "Recording saved in " + recording.parts + " pieces (too large to merge automatically). To join them on a Mac: download the folder, then run  cat rec*-part-*.webm > screen-recording.webm  inside it.",
     incomplete: "Recording is incomplete — missing pieces: " + recording.missing + ".",
-    none: "No recording for this participant."
+    none: "No recording for this participant.",
+    unchanged: "Answers updated; the recording uploaded earlier is unchanged."
   }[recording.status] || "";
   const html = "<p><b>" + escape_(record.participant_id) + "</b> finished the Pathways study.</p>" +
     "<p>" + escape_(recordingLine) + "<br><a href='" + folder.getUrl() + "'>Open this participant's Drive folder</a> · " +

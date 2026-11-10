@@ -1,4 +1,5 @@
 import { searchExperiences, barriers, formats, MAX_CHANNELS, channels, infoWantedOptions, scenarios } from "./questions.js";
+import { SUBMIT_URL } from "./participant-config.js";
 
 const pickedChannels = () => channels.filter(channel => $(`input[name="channelsUsed"][value="${channel.label}"]`)?.checked);
 
@@ -690,8 +691,10 @@ async function completeSession() {
   currentSession.completedAt = new Date().toISOString();
   currentSession.updatedAt = currentSession.completedAt;
   await putSession(currentSession);
-  toast(selectedMode() === "survey" ? "Survey saved locally." : selectedMode() === "observation" ? "Observation saved locally." : "Linked survey and observation saved locally.");
+  toast(selectedMode() === "survey" ? "Survey saved — sending to the team…" : selectedMode() === "observation" ? "Observation saved — sending to the team…" : "Survey and observation saved — sending to the team…");
+  const savedId = currentSession.id;
   routeTo("sessions");
+  sendSessionToTeam(savedId); // runs in the background; Local data shows Sent ✓ or Retry send
 }
 
 async function resumeSession(id) {
@@ -996,6 +999,149 @@ async function importData(file) {
   }
 }
 
+
+// ---- Send finished sessions to the research team (same Apps Script as the participant page) ----
+const TEAM_PIECE_BYTES = 6 * 1024 * 1024;           // recording upload piece size
+const TEAM_ID = /^[PSO]-\d{6}-[A-Z0-9]{4}$/;
+const MODE_LABELS = { survey: "Survey only", observation: "Observation only", both: "Survey + observation" };
+
+async function postToTeam(sessionId, participantId, payload, tries = 4) {
+  let lastError;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    try {
+      const response = await fetch(SUBMIT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ app: "pathways", sessionId, participantId, ...payload })
+      });
+      const result = await response.json().catch(() => ({ ok: false, error: `Unexpected response (${response.status})` }));
+      if (!result.ok) throw new Error(result.error || "Upload was not accepted.");
+      return result;
+    } catch (error) {
+      lastError = error;
+      if (/Bad (session|participant) id|Unknown/.test(error.message)) break; // not worth retrying
+      await new Promise(resolve => setTimeout(resolve, Math.min(1000 * 2 ** attempt, 10000)));
+    }
+  }
+  throw lastError;
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function renameKeys(row, renames, drop = []) {
+  const out = {};
+  Object.entries(row).forEach(([key, value]) => { if (!drop.includes(key)) out[renames[key] || key] = value; });
+  return out;
+}
+
+// One flat row for the team sheet: survey and observation fields side by side.
+function teamRecord(session) {
+  const mode = sessionMode(session);
+  const response = session.responses || {};
+  const record = {
+    source: "researcher-app",
+    researcher: response.researcher || "",
+    mode,
+    mode_label: MODE_LABELS[mode] || mode,
+    participant_arrangement: mode === "both" ? (response.participantArrangement || "same") : "",
+    created_at: session.createdAt,
+    completed_at: session.completedAt || ""
+  };
+  if (mode !== "observation") Object.assign(record, renameKeys(surveyRow(session), { participant_id: "survey_participant_id", academic_stage: "survey_academic_stage", major: "survey_major", completed_at: "survey_completed_at" }, ["session_id", "module"]));
+  if (mode !== "survey") Object.assign(record, renameKeys(observationRow(session), { participant_id: "observation_participant_id", academic_stage: "observation_academic_stage", major: "observation_major", completed_at: "observation_completed_at" }, ["session_id", "module"]));
+  return record;
+}
+
+async function setUploadState(id, upload) {
+  const fresh = await getSession(id);
+  if (!fresh) return;
+  fresh.upload = upload;
+  await putSession(fresh);
+  if (currentSession?.id === id) currentSession.upload = upload; // keep autosave from overwriting it
+  if ($("#sessions")?.classList.contains("active")) renderSessions();
+}
+
+async function sendSessionToTeam(id, { quiet = false } = {}) {
+  const session = await getSession(id);
+  if (!session) return false;
+  const previous = session.upload || {};
+  if (!SUBMIT_URL) {
+    await setUploadState(id, { ...previous, status: "failed", error: "Team upload is not set up (participant-config.js)." });
+    return false;
+  }
+  const participants = moduleParticipants(session);
+  const mode = sessionMode(session);
+  const participantId = mode === "observation" ? participants.observationId : (participants.surveyId || participants.observationId);
+  if (!TEAM_ID.test(participantId || "")) {
+    await setUploadState(id, { ...previous, status: "failed", error: `Participant ID “${participantId || "—"}” has an old format; export this session instead.` });
+    if (!quiet) toast("This session has an old-style ID and can't be sent; use Export instead.");
+    return false;
+  }
+  await setUploadState(id, { ...previous, status: "sending", error: "" });
+  try {
+    const recording = session.hasRecording ? await getRecording(id) : null;
+    const signature = recording?.blob ? `${recording.blob.size}:${recording.blob.type}` : "";
+    const keepRecording = Boolean(signature) && previous.status === "sent" && previous.recordingSignature === signature;
+    let attempt = 0;
+    let partCount = 0;
+    if (recording?.blob && !keepRecording) {
+      attempt = (previous.attempt || 0) + 1;
+      partCount = Math.ceil(recording.blob.size / TEAM_PIECE_BYTES);
+      for (let index = 0; index < partCount; index++) {
+        if (!quiet) toast(`Sending recording to the team… ${index + 1}/${partCount}`);
+        const piece = recording.blob.slice(index * TEAM_PIECE_BYTES, (index + 1) * TEAM_PIECE_BYTES);
+        await postToTeam(id, participantId, { action: "chunk", attempt, index, data: await blobToBase64(piece) });
+      }
+    }
+    const record = { ...teamRecord(session), resent: previous.status === "sent" };
+    const files = { "complete-session.json": JSON.stringify(session, null, 2) };
+    if (mode !== "survey") files["trace.json"] = JSON.stringify(traceJson(session), null, 2);
+    await postToTeam(id, participantId, { action: "submit", attempt, partCount, keepRecording, record, files });
+    await setUploadState(id, {
+      status: "sent",
+      at: new Date().toISOString(),
+      attempt: keepRecording ? previous.attempt : attempt,
+      recordingSignature: signature,
+      error: ""
+    });
+    if (!quiet) toast("Sent to the research team ✓");
+    return true;
+  } catch (error) {
+    console.error(error);
+    const message = /failed to fetch|networkerror|load failed/i.test(error.message || "") ? "No connection to the team server." : error.message;
+    await setUploadState(id, { ...previous, status: "failed", error: message, at: new Date().toISOString() });
+    if (!quiet) toast(`Not sent yet: ${message} It stays saved here — use “Retry send” in Local data.`);
+    return false;
+  }
+}
+
+async function sendAllUnsent() {
+  const pending = (await getSessions()).filter(session => session.status === "complete" && session.upload?.status !== "sent");
+  if (!pending.length) return toast("Every completed session has already been sent.");
+  let sent = 0;
+  for (const [index, session] of pending.entries()) {
+    toast(`Sending ${index + 1} of ${pending.length}…`);
+    if (await sendSessionToTeam(session.id, { quiet: true })) sent++;
+  }
+  toast(sent === pending.length ? `Sent ${sent} session(s) to the team ✓` : `Sent ${sent} of ${pending.length}. The rest show “Retry send”.`);
+}
+
+function uploadBadge(session) {
+  if (session.status !== "complete") return "";
+  const upload = session.upload || {};
+  if (upload.status === "sent") return `<span class="upload-badge sent" title="Sent ${escapeHtml(new Date(upload.at).toLocaleString())}">Sent to team ✓</span>`;
+  if (upload.status === "sending") return '<span class="upload-badge sending">Sending…</span>';
+  if (upload.status === "failed") return `<span class="upload-badge failed" title="${escapeHtml(upload.error || "")}">Not sent</span>`;
+  return '<span class="upload-badge">Not sent</span>';
+}
+
 async function removeSession(id) {
   const session = await getSession(id);
   const participants = session ? moduleParticipants(session) : {};
@@ -1023,7 +1169,7 @@ async function renderSessions() {
     const mode = sessionMode(s);
     const p = moduleParticipants(s);
     const participantLabel = mode === "both" && p.surveyId !== p.observationId ? `Survey: ${p.surveyId || "—"} · Observation: ${p.observationId || "—"}` : p.surveyId || p.observationId || "Untitled session";
-    return `<article class="session-card"><div><h3>${escapeHtml(participantLabel)} <span class="module-badge ${mode}">${mode === "both" ? "Survey + observation" : mode}</span> <span class="status ${s.status === "complete" ? "complete" : ""}">${s.status === "complete" ? "Completed" : "Draft"}</span></h3><div class="session-meta"><span>${new Date(s.createdAt).toLocaleString()}</span>${s.moduleStatus?.survey === "complete" ? '<span class="checkpoint">Survey archived</span>' : ""}${mode !== "observation" ? `<span>Survey: ${escapeHtml(p.surveyStage || "Stage not entered")}</span>` : ""}${mode !== "survey" ? `<span>Observation: ${escapeHtml(p.observationStage || "Stage not entered")}</span><span>${escapeHtml(response.scenarioTitle || "No scenario")}</span><span>${stats.clicks} clicks</span><span>${formatTime(stats.dwell)} active</span>` : ""}</div></div><div class="session-actions"><button class="button primary" data-resume="${s.id}">${s.status === "complete" ? "Open / edit" : "Resume"}</button>${mode !== "observation" ? `<button class="button secondary" data-export="survey" data-id="${s.id}">Survey CSV</button>` : ""}${mode !== "survey" ? `<button class="button secondary" data-export="observation" data-id="${s.id}">Observation CSV</button>` : ""}${s.traceComplete ? `<button class="button secondary" data-view-trace="${s.id}">View trace</button><button class="button secondary" data-export="tracejson" data-id="${s.id}">Trace JSON</button><button class="button secondary" data-export="trace" data-id="${s.id}">Trace CSV</button>` : ""}${s.hasRecording ? `<button class="button primary" data-export="video" data-id="${s.id}">Raw WebM</button>` : ""}<button class="button secondary" data-export="json" data-id="${s.id}">Complete JSON</button><button class="button danger" data-delete="${s.id}">Delete</button></div></article>`;
+    return `<article class="session-card"><div><h3>${escapeHtml(participantLabel)} <span class="module-badge ${mode}">${mode === "both" ? "Survey + observation" : mode}</span> <span class="status ${s.status === "complete" ? "complete" : ""}">${s.status === "complete" ? "Completed" : "Draft"}</span></h3><div class="session-meta">${uploadBadge(s)}<span>${new Date(s.createdAt).toLocaleString()}</span>${s.moduleStatus?.survey === "complete" ? '<span class="checkpoint">Survey archived</span>' : ""}${mode !== "observation" ? `<span>Survey: ${escapeHtml(p.surveyStage || "Stage not entered")}</span>` : ""}${mode !== "survey" ? `<span>Observation: ${escapeHtml(p.observationStage || "Stage not entered")}</span><span>${escapeHtml(response.scenarioTitle || "No scenario")}</span><span>${stats.clicks} clicks</span><span>${formatTime(stats.dwell)} active</span>` : ""}</div></div><div class="session-actions"><button class="button primary" data-resume="${s.id}">${s.status === "complete" ? "Open / edit" : "Resume"}</button>${mode !== "observation" ? `<button class="button secondary" data-export="survey" data-id="${s.id}">Survey CSV</button>` : ""}${mode !== "survey" ? `<button class="button secondary" data-export="observation" data-id="${s.id}">Observation CSV</button>` : ""}${s.traceComplete ? `<button class="button secondary" data-view-trace="${s.id}">View trace</button><button class="button secondary" data-export="tracejson" data-id="${s.id}">Trace JSON</button><button class="button secondary" data-export="trace" data-id="${s.id}">Trace CSV</button>` : ""}${s.hasRecording ? `<button class="button primary" data-export="video" data-id="${s.id}">Raw WebM</button>` : ""}<button class="button secondary" data-export="json" data-id="${s.id}">Complete JSON</button>${s.status === "complete" && s.upload?.status !== "sent" && s.upload?.status !== "sending" ? `<button class="button primary" data-send="${s.id}">${s.upload?.status === "failed" ? "↻ Retry send" : "↑ Send to team"}</button>` : ""}<button class="button danger" data-delete="${s.id}">Delete</button></div></article>`;
   }).join("") : '<div class="empty-state"><div style="font-size:36px">◎</div><strong>No local sessions yet</strong><p>Start a study to collect a survey, automatic behavior trace, and raw recording.</p><button class="button primary" data-action="new-session">New session</button></div>';
 }
 
@@ -1048,6 +1194,8 @@ function bindEvents() {
     if (exportButton) exportItem(exportButton.dataset.id, exportButton.dataset.export);
     const deleteButton = event.target.closest("[data-delete]");
     if (deleteButton) removeSession(deleteButton.dataset.delete);
+    const sendButton = event.target.closest("[data-send]");
+    if (sendButton) sendSessionToTeam(sendButton.dataset.send);
     const resumeButton = event.target.closest("[data-resume]");
     if (resumeButton) resumeSession(resumeButton.dataset.resume);
     const traceButton = event.target.closest("[data-view-trace]");
@@ -1110,6 +1258,7 @@ function bindEvents() {
     catch { prompt("Copy this participant link:", link); }
   });
   $("#import-data").addEventListener("click", () => $("#import-file").click());
+  $("#send-unsent")?.addEventListener("click", sendAllUnsent);
   $("#import-file").addEventListener("change", event => { const [file] = event.target.files; event.target.value = ""; if (file) importData(file); });
   $("#close-trace").addEventListener("click", () => $("#trace-dialog").close());
   document.addEventListener("PATHWAYS_TRACE_STATUS", event => setExtensionStatus(Boolean(event.detail?.connected)));
